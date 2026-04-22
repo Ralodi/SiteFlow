@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { useAuth } from '../../lib/auth';
 
 const dark = { background:'#0e0f0c', color:'#f0ede6', minHeight:'100vh', fontFamily:'var(--font-body)' };
 const sec = { padding:'clamp(60px,8vw,100px) clamp(20px,5vw,60px)', maxWidth:1140, margin:'0 auto' };
@@ -238,7 +240,38 @@ export function ContactPage() {
 /* ══════════════════════════════════════════ LOGIN ══════════════════════════════════════════ */
 export function LoginPage() {
   const navigate = useNavigate();
+  const { signIn } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState('manager'); // 'manager' | 'field'
+
   const inp = { width:'100%', padding:'11px 14px', background:'#252620', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:10, color:'#f0ede6', fontSize:14, fontFamily:'var(--font-body)', outline:'none', marginBottom:14 };
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    console.log('Attempting login with:', email);
+    console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+    try {
+      const { data, error } = await signIn(email, password);
+      console.log('Login result:', { data, error });
+      setLoading(false);
+      if (error) {
+        setError(error.message || 'Login failed — check console for details');
+      } else if (data?.session) {
+        navigate(mode === 'field' ? '/field' : '/app');
+      } else {
+        setError('No session returned — check Supabase configuration');
+      }
+    } catch (err) {
+      console.error('Login exception:', err);
+      setLoading(false);
+      setError('Connection error: ' + err.message);
+    }
+  };
 
   return (
     <div style={{ ...dark, display:'flex', alignItems:'center', justifyContent:'center', minHeight:'100vh', position:'relative' }}>
@@ -250,20 +283,42 @@ export function LoginPage() {
           </div>
           <span style={{ fontFamily:'var(--font-display)', fontSize:'1.2rem', fontWeight:800, color:'#f0ede6', letterSpacing:'-0.02em' }}>SiteFlow</span>
         </div>
-        <div style={{ fontFamily:'var(--font-display)', fontSize:'1.5rem', fontWeight:700, color:'#f0ede6', marginBottom:6 }}>Welcome back</div>
-        <div style={{ fontSize:14, color:'rgba(240,237,230,0.45)', marginBottom:28 }}>Log in to your project workspace</div>
-        <label style={{ fontSize:11, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', color:'rgba(240,237,230,0.4)', display:'block', marginBottom:6 }}>Email</label>
-        <input type="email" style={inp} placeholder="you@yourcompany.co.za"/>
-        <label style={{ fontSize:11, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', color:'rgba(240,237,230,0.4)', display:'block', marginBottom:6 }}>Password</label>
-        <input type="password" style={inp} placeholder="••••••••••"/>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-          <label style={{ display:'flex', alignItems:'center', gap:7, cursor:'pointer', fontSize:13, color:'rgba(240,237,230,0.5)' }}><input type="checkbox" style={{ accentColor:'var(--amber)' }}/> Remember me</label>
-          <button style={{ background:'none', border:'none', color:'var(--amber)', fontSize:13, cursor:'pointer', fontFamily:'var(--font-body)', textDecoration:'underline' }}>Forgot password?</button>
+
+        {/* Login type toggle */}
+        <div style={{ display:'flex', background:'#252620', borderRadius:9, padding:3, marginBottom:28 }}>
+          {[['manager','🏗️ Manager'],['field','🔧 Field']].map(([key, label]) => (
+            <button key={key} onClick={() => setMode(key)} style={{ flex:1, padding:'8px', borderRadius:7, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)', border:'none', background: mode===key ? '#1e2019' : 'transparent', color: mode===key ? '#f0ede6' : 'rgba(240,237,230,0.4)', transition:'all 0.15s' }}>
+              {label}
+            </button>
+          ))}
         </div>
-        <button onClick={() => navigate('/app')} style={{ width:'100%', padding:'13px', background:'var(--amber)', color:'#0e0f0c', border:'none', borderRadius:9, fontSize:15, fontWeight:600, cursor:'pointer', fontFamily:'var(--font-body)', marginBottom:16 }}>Log in to SiteFlow →</button>
-        <button onClick={() => navigate('/field')} style={{ width:'100%', padding:'13px', background:'transparent', color:'rgba(240,237,230,0.6)', border:'0.5px solid rgba(255,255,255,0.14)', borderRadius:9, fontSize:14, fontWeight:500, cursor:'pointer', fontFamily:'var(--font-body)' }}>🔧 &nbsp;Field contractor login</button>
-        <div style={{ textAlign:'center', marginTop:22, fontSize:13, color:'rgba(240,237,230,0.3)' }}>
-          Don't have an account? <button onClick={() => navigate('/contact')} style={{ background:'none', border:'none', color:'var(--amber)', cursor:'pointer', fontFamily:'var(--font-body)', fontSize:13, textDecoration:'underline' }}>Request access</button>
+
+        <div style={{ fontFamily:'var(--font-display)', fontSize:'1.5rem', fontWeight:700, color:'#f0ede6', marginBottom:6 }}>Welcome back</div>
+        <div style={{ fontSize:14, color:'rgba(240,237,230,0.45)', marginBottom:24 }}>
+          {mode === 'field' ? 'Log in to your field workspace' : 'Log in to your project dashboard'}
+        </div>
+
+        {error && (
+          <div style={{ background:'rgba(160,32,32,0.15)', border:'0.5px solid rgba(160,32,32,0.4)', borderRadius:8, padding:'10px 14px', fontSize:13, color:'#f5a0a0', marginBottom:16 }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        <form onSubmit={handleLogin}>
+          <label style={{ fontSize:11, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', color:'rgba(240,237,230,0.4)', display:'block', marginBottom:6 }}>Email</label>
+          <input type="email" required style={inp} placeholder="you@yourcompany.co.za" value={email} onChange={e => setEmail(e.target.value)}/>
+          <label style={{ fontSize:11, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase', color:'rgba(240,237,230,0.4)', display:'block', marginBottom:6 }}>Password</label>
+          <input type="password" required style={inp} placeholder="••••••••••" value={password} onChange={e => setPassword(e.target.value)}/>
+          <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:20 }}>
+            <button type="button" style={{ background:'none', border:'none', color:'var(--amber)', fontSize:13, cursor:'pointer', fontFamily:'var(--font-body)', textDecoration:'underline' }}>Forgot password?</button>
+          </div>
+          <button type="submit" disabled={loading} style={{ width:'100%', padding:'13px', background: loading ? '#a07010' : 'var(--amber)', color:'#0e0f0c', border:'none', borderRadius:9, fontSize:15, fontWeight:600, cursor: loading ? 'not-allowed' : 'pointer', fontFamily:'var(--font-body)', marginBottom:12 }}>
+            {loading ? 'Signing in...' : `Log in to SiteFlow →`}
+          </button>
+        </form>
+
+        <div style={{ textAlign:'center', marginTop:16, fontSize:13, color:'rgba(240,237,230,0.3)' }}>
+          Need access? <button onClick={() => navigate('/contact')} style={{ background:'none', border:'none', color:'var(--amber)', cursor:'pointer', fontFamily:'var(--font-body)', fontSize:13, textDecoration:'underline' }}>Request access</button>
         </div>
       </div>
     </div>
