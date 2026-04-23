@@ -23,6 +23,9 @@ export function RequireSuperAdmin({ children }) {
         <div style={{ fontSize:40 }}>🔒</div>
         <div style={{ fontFamily:'var(--font-display)', fontSize:'1.2rem', fontWeight:700, color:'#f0ede6' }}>Access Denied</div>
         <div style={{ fontSize:14, color:'rgba(240,237,230,0.4)' }}>This area is restricted to SiteFlow operators only.</div>
+        <div style={{ fontSize:12, color:'rgba(240,237,230,0.25)', marginTop:8, fontFamily:'monospace' }}>
+          Logged in as: {session.user.email}
+        </div>
         <button onClick={() => window.location.href='/app'} style={{ marginTop:8, padding:'9px 20px', background:'#7c3aed', border:'none', borderRadius:9, color:'#fff', cursor:'pointer', fontSize:13, fontFamily:'var(--font-body)' }}>
           Back to App
         </button>
