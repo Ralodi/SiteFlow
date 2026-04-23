@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { StoreProvider } from './store';
 import { AuthProvider } from './lib/auth';
-import { RequireAuth } from './lib/guards';
+import { RequireAuth, RequireSuperAdmin } from './lib/guards';
 
 // Public pages
 import PublicLayout from './pages/public/PublicLayout';
@@ -62,7 +62,7 @@ export default function App() {
             </Route>
 
             {/* Super admin — your operator panel */}
-            <Route path="/superadmin" element={<SuperAdminLayout />}>
+            <Route path="/superadmin" element={<RequireSuperAdmin><SuperAdminLayout /></RequireSuperAdmin>}>
               <Route index element={<SAOverview />} />
               <Route path="tenants" element={<SATenants />} />
               <Route path="onboard" element={<SAOnboarding />} />
