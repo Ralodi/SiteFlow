@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../lib/auth';
 import { INDUSTRY_LABELS } from './superadminData';
 
 const inp = { width:'100%', padding:'10px 12px', background:'#1e2028', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:9, color:'#f0ede6', fontSize:13.5, fontFamily:'var(--font-body)', outline:'none' };
@@ -12,6 +13,7 @@ function generatePassword() {
 }
 
 export default function SAOnboarding() {
+  const { session } = useAuth();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -28,26 +30,33 @@ export default function SAOnboarding() {
     setError('');
     const tempPassword = generatePassword();
     try {
-      // Use signUp — creates user and sends confirmation email
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: form.contactEmail,
-        password: tempPassword,
-        options: {
-          data: { full_name: form.contactName, company: form.company, role: form.role }
+      // Call the edge function — creates user server-side without affecting your session
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const token = currentSession?.access_token;
+
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({
+            email: form.contactEmail,
+            password: tempPassword,
+            full_name: form.contactName,
+            company: form.company,
+            role: form.role,
+            phone: form.contactPhone,
+          }),
         }
-      });
-      if (signUpError) throw new Error(signUpError.message);
-      // Update their profile row
-      if (data?.user?.id) {
-        await supabase.from('profiles').upsert({
-          id: data.user.id,
-          full_name: form.contactName,
-          company: form.company,
-          role: form.role,
-          phone: form.contactPhone,
-        });
-      }
-      setResult({ tempPassword, email: form.contactEmail, userId: data?.user?.id });
+      );
+
+      const result = await res.json();
+      if (!res.ok || result.error) throw new Error(result.error || 'Failed to create user');
+      setResult({ tempPassword, email: form.contactEmail, userId: result.userId });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -104,15 +113,15 @@ export default function SAOnboarding() {
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
               <div style={{ gridColumn:'1/-1' }}>
                 <label style={lbl}>Company name *</label>
-                <input style={inp} value={form.company} onChange={e=>f('company',e.target.value)} placeholder="e.g. Khumalo Civil Works"/>
+                <input style={inp} value={form.company} onChange={e=>f('company',e.target.value)} placeholder="e.g. Khumalo Civil Works" autoComplete="off" name="client_company_field"/>
               </div>
               <div>
                 <label style={lbl}>Contact person *</label>
-                <input style={inp} value={form.contactName} onChange={e=>f('contactName',e.target.value)} placeholder="Full name"/>
+                <input style={inp} value={form.contactName} onChange={e=>f('contactName',e.target.value)} placeholder="Full name" autoComplete="off" name="client_name_field"/>
               </div>
               <div>
                 <label style={lbl}>Login email *</label>
-                <input type="email" style={inp} value={form.contactEmail} onChange={e=>f('contactEmail',e.target.value)} placeholder="email@company.co.za"/>
+                <input type="email" style={inp} value={form.contactEmail} onChange={e=>f('contactEmail',e.target.value)} placeholder="client@theircompany.co.za" autoComplete="new-password" name="client_email_field"/>
               </div>
               <div>
                 <label style={lbl}>Phone</label>

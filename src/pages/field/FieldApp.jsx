@@ -10,7 +10,7 @@ export default function FieldApp() {
   const { state, dispatch, computed } = useStore();
   const [tab, setTab] = useState(0);
   const [logType, setLogType] = useState('poles');
-  const [photos, setPhotos] = useState([]);
+  const [photos, setPhotos] = useState([]); // [{id, url, file, name}]
   const [submitted, setSubmitted] = useState(false);
   const [form, setForm] = useState({ date: new Date().toISOString().split('T')[0], zoneId: '', quantity: '', supervisor: FIELD_USER.name, notes: '' });
 
@@ -26,8 +26,25 @@ export default function FieldApp() {
   const paid = Math.floor(earned * 0.7);
   const pending = earned - paid;
 
-  const handlePhotoAdd = () => {
-    if (photos.length < 6) setPhotos([...photos, { id: Date.now(), emoji: ['📸', '🖼️', '📷'][photos.length % 3] }]);
+  const handlePhotoSelect = (e) => {
+    const files = Array.from(e.target.files);
+    const newPhotos = files.slice(0, 6 - photos.length).map(file => ({
+      id: Date.now() + Math.random(),
+      url: URL.createObjectURL(file),
+      file,
+      name: file.name,
+    }));
+    setPhotos(prev => [...prev, ...newPhotos].slice(0, 6));
+    e.target.value = ''; // reset so same file can be selected again
+  };
+
+  const removePhoto = (id) => setPhotos(prev => prev.filter(p => p.id !== id));
+
+  const downloadPhoto = (photo) => {
+    const a = document.createElement('a');
+    a.href = photo.url;
+    a.download = photo.name || 'proof-photo.jpg';
+    a.click();
   };
 
   const handleSubmit = () => {
@@ -191,25 +208,73 @@ export default function FieldApp() {
                     <textarea className="field-textarea" placeholder="Any site conditions, issues, or notes..." value={form.notes} onChange={e => setForm({...form, notes:e.target.value})}/>
 
                     {/* Photo upload */}
-                    <label className="field-label">Proof of work photos</label>
+                    <label className="field-label">Proof of work photos ({photos.length}/6)</label>
+
+                    {/* Hidden file input — accepts camera + gallery */}
+                    <input
+                      id="photo-input"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      capture="environment"
+                      style={{ display:'none' }}
+                      onChange={handlePhotoSelect}
+                    />
+
+                    {/* Photo previews */}
                     {photos.length > 0 && (
-                      <div className="field-photo-preview">
+                      <div className="field-photo-preview" style={{ marginBottom:12 }}>
                         {photos.map(p => (
-                          <div key={p.id} className="field-photo-thumb">{p.emoji}</div>
+                          <div key={p.id} style={{ position:'relative', aspectRatio:'1', borderRadius:10, overflow:'hidden', border:'0.5px solid rgba(255,255,255,0.1)' }}>
+                            <img src={p.url} alt="proof" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
+                            {/* Overlay buttons */}
+                            <div style={{ position:'absolute', top:4, right:4, display:'flex', gap:4 }}>
+                              <button
+                                onClick={() => downloadPhoto(p)}
+                                style={{ width:26, height:26, borderRadius:6, background:'rgba(0,0,0,0.6)', border:'none', cursor:'pointer', fontSize:13, display:'flex', alignItems:'center', justifyContent:'center' }}
+                                title="Download"
+                              >⬇️</button>
+                              <button
+                                onClick={() => removePhoto(p.id)}
+                                style={{ width:26, height:26, borderRadius:6, background:'rgba(160,32,32,0.7)', border:'none', cursor:'pointer', fontSize:13, color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700 }}
+                                title="Remove"
+                              >✕</button>
+                            </div>
+                          </div>
                         ))}
                         {photos.length < 6 && (
-                          <div className="field-photo-thumb" style={{ cursor:'pointer', fontSize:18, color:'rgba(240,237,230,0.3)' }} onClick={handlePhotoAdd}>+</div>
+                          <div
+                            onClick={() => document.getElementById('photo-input').click()}
+                            style={{ aspectRatio:'1', borderRadius:10, border:'1.5px dashed rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', fontSize:22, color:'rgba(240,237,230,0.3)' }}
+                          >+</div>
                         )}
                       </div>
                     )}
+
+                    {/* Upload button — shows when no photos yet */}
                     {photos.length === 0 && (
-                      <div className="field-photo-upload" onClick={handlePhotoAdd}>
-                        <div className="field-photo-icon">📷</div>
-                        <div className="field-photo-text">
-                          <strong>Tap to add photos</strong>
-                          Geotagged proof of installation
+                      <div style={{ marginBottom:14 }}>
+                        <div
+                          onClick={() => document.getElementById('photo-input').click()}
+                          className="field-photo-upload"
+                        >
+                          <div className="field-photo-icon">📷</div>
+                          <div className="field-photo-text">
+                            <strong>Tap to take a photo or upload</strong>
+                            Camera or gallery — up to 6 photos
+                          </div>
                         </div>
                       </div>
+                    )}
+
+                    {/* Download all button */}
+                    {photos.length > 1 && (
+                      <button
+                        onClick={() => photos.forEach(p => downloadPhoto(p))}
+                        style={{ width:'100%', padding:'9px', background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.12)', borderRadius:9, color:'rgba(240,237,230,0.6)', cursor:'pointer', fontSize:13, fontFamily:'var(--font-body)', marginBottom:14 }}
+                      >
+                        ⬇️ Download all {photos.length} photos
+                      </button>
                     )}
 
                     <button className="field-submit-btn" onClick={handleSubmit} disabled={!form.zoneId || !form.quantity}>
